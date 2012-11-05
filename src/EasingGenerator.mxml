@@ -1,0 +1,325 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+Easing Generator
+
+The MIT License
+
+Copyright (c) 2010 Yasunobu Ikeda
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+-->
+
+<s:WindowedApplication xmlns:fx="http://ns.adobe.com/mxml/2009"
+					   xmlns:s="library://ns.adobe.com/flex/spark"
+					   xmlns:mx="library://ns.adobe.com/flex/mx"
+					   showStatusBar="false"
+					   frameRate="30"
+					   creationComplete="_onCreationComplete(event)"
+					   xmlns:local="*"
+					   xmlns:myproject="myproject.*"
+					   xmlns:ui="myproject.ui.*">
+	<fx:Declarations>
+		<!-- 非ビジュアルエレメント (サービス、値オブジェクトなど) をここに配置 -->
+		<s:RadioButtonGroup id="tweenEngine"
+							change="_onTweenEngineChange(event)"/>
+	</fx:Declarations>
+
+	<fx:Style>
+		@namespace s "library://ns.adobe.com/flex/spark";
+		@namespace mx "library://ns.adobe.com/flex/mx";
+		
+		s|WindowedApplication{
+			background-alpha:0;
+		}
+		
+		s|Button{
+			corner-radius:0;
+			skinClass: ClassReference('myproject.skins.MyButtonSkin');
+			backgroundGradientTopColor:#e5e5e5;
+			backgroundGradientBottomColor:#c8c8c8;
+		}
+		
+		global{
+			modalTransparencyBlur: 0;
+			modalTransparency: 0;
+			modalTransparencyDuration: 0;
+		}
+		
+		s|Label{
+			color:#444444;
+		}
+		
+	</fx:Style>
+
+	<fx:Script>
+		<![CDATA[
+			import flash.desktop.ClipboardFormats;
+			import flash.desktop.Clipboard;
+			import flash.net.navigateToURL;
+			import mx.events.FlexEvent;
+			import mx.managers.PopUpManager;
+			import myproject.BezierGraph;
+			import myproject.data.Preset;
+			import myproject.data.PresetData;
+			import myproject.ui.AlertWindow;
+			import spark.events.IndexChangeEvent;
+
+			public static var instance:EasingGenerator;
+
+			private var _bezierGraph:BezierGraph;
+			private var _oldPlayed:Boolean;
+
+			public function changeContainer():void
+			{
+				if (vs.selectedIndex == 1)
+				{
+					vs.selectedIndex = 0;
+					stage.frameRate = 60;
+					autoCb.selected = _oldPlayed;
+					autoCb_changeHandler(null);
+				}
+				else
+				{
+					_oldPlayed = autoCb.selected;
+					vs.selectedIndex = 1;
+					stage.frameRate = 5;
+					_bezierGraph.stopPreview();
+					autoCb.selected = false;
+				}
+			}
+
+			protected function _onCreationComplete(event:FlexEvent):void
+			{
+				instance = this;
+
+				_bezierGraph = new BezierGraph();
+				_bezierGraph.currentTime = timeNs.value;
+				canvas.addChild(_bezierGraph);
+			}
+
+			protected function autoCb_changeHandler(event:Event):void
+			{
+				if (autoCb.selected)
+				{
+					_bezierGraph.playPreviewLoop();
+				}
+				else
+				{
+					_bezierGraph.stopPreview();
+				}
+			}
+
+			protected function _onPlayBtnClick(event:MouseEvent):void
+			{
+				_bezierGraph.playPreview();
+			}
+
+			protected function _onStopBtnClick(event:MouseEvent):void
+			{
+				_bezierGraph.stopPreview();
+			}
+
+			protected function _onResetBtnClick(event:MouseEvent):void
+			{
+				presetCb.selectedIndex = 0;
+				_bezierGraph.reset((presetCb.selectedItem as PresetData));
+			}
+
+			protected function _onCopyBtnClick(event:MouseEvent):void
+			{
+				Clipboard.generalClipboard.setData(ClipboardFormats.TEXT_FORMAT, _bezierGraph.copy());
+			}
+
+			protected function _onShowBtnClick(event:MouseEvent):void
+			{
+				var alert:AlertWindow = new AlertWindow();
+				alert.code = _bezierGraph.copy();
+				PopUpManager.addPopUp(alert, EasingGenerator.instance, true);
+				PopUpManager.centerPopUp(alert);
+			}
+
+			protected function _onTweenEngineChange(event:Event):void
+			{
+				_bezierGraph.engine = tweenEngine.selection.label;
+			}
+
+			protected function presetCb_changeHandler(event:IndexChangeEvent):void
+			{
+				_bezierGraph.reset((presetCb.selectedItem as PresetData));
+			}
+
+			protected function _onMoreInfoBtnClick(event:MouseEvent):void
+			{
+				var url:String = Capabilities.language == "ja"
+					? "http://clockmaker.jp/blog/"
+					: "http://clockmaker.jp/blog-en/";
+				navigateToURL(new URLRequest(url), "_blank");
+			}
+
+			protected function _onTimeNsChange(event:Event):void
+			{
+				_bezierGraph.currentTime = timeNs.value;
+				_bezierGraph.updateTweens(autoCb.selected);
+			}
+
+			protected function _onFpsNsChange(event:Event):void
+			{
+				stage.frameRate = fpsNs.value;
+			}
+
+			private function _sliderDataTip(val:Number):String
+			{
+				var str:String = (Math.round(val * 10) / 10).toString(10);
+				if (str.length == 1)
+					str += ".0";
+				return str + " sec";
+			}
+		]]>
+	</fx:Script>
+	<s:layout>
+		<s:VerticalLayout gap="0"/>
+	</s:layout>
+	<ui:HeaderUI height="30"/>
+	<mx:ViewStack id="vs"
+				  creationPolicy="all"
+				  width="100%"
+				  height="100%">
+		<s:NavigatorContent>
+			<s:BorderContainer id="container"
+							   width="100%"
+							   height="100%"
+							   skinClass="myproject.skins.MyBorderSkin">
+				<mx:UIComponent id="canvas"/>
+				<s:Button x="622"
+						  y="10"
+						  width="100"
+						  height="18"
+						  label="Copy"
+						  toolTip="Copy to Clipboard"
+						  click="_onCopyBtnClick(event)"/>
+				<s:Button x="622"
+						  y="36"
+						  width="100"
+						  height="18"
+						  label="Show Source"
+						  toolTip="Show Source Code"
+						  click="_onShowBtnClick(event)"/>
+				<s:Button x="622"
+						  y="333"
+						  width="100"
+						  height="18"
+						  label="More Info..."
+						  toolTip="More Info from Developer Blog"
+						  click="_onMoreInfoBtnClick(event)"/>
+				<s:Button x="622"
+						  y="238"
+						  width="100"
+						  height="18"
+						  label="Reset"
+						  toolTip="Reset Control Points"
+						  click="_onResetBtnClick(event)"/>
+				<s:Button x="34"
+						  y="360"
+						  label="■"
+						  width="21"
+						  toolTip="Stop Preview"
+						  enabled="{!autoCb.selected}"
+						  click="_onStopBtnClick(event)"/>
+				<s:Button x="62"
+						  y="360"
+						  label="▶"
+						  width="21"
+						  toolTip="Play Preview"
+						  enabled="{!autoCb.selected}"
+						  click="_onPlayBtnClick(event)"/>
+				<s:CheckBox x="105"
+							y="361"
+							label="Loop Play"
+							id="autoCb"
+							selected="true"
+							change="autoCb_changeHandler(event)"/>
+				<s:RadioButton x="623"
+							   y="64"
+							   label="Tweener"
+							   selected="true"
+							   group="{tweenEngine}"/>
+				<s:RadioButton x="623"
+							   y="87"
+							   label="BetweenAS3"
+							   group="{tweenEngine}"/>
+				<s:RadioButton x="623"
+							   y="110"
+							   label="KTween"
+							   group="{tweenEngine}"/>
+				<s:RadioButton x="623"
+							   y="132"
+							   label="TweenMax"
+							   group="{tweenEngine}"/>
+				<s:RadioButton x="623"
+							   y="155"
+							   label="Tween24"
+							   group="{tweenEngine}"/>
+				<s:ComboBox x="621"
+							y="207"
+							width="100"
+							dataProvider="{Preset.presetAC}"
+							selectedIndex="0"
+							id="presetCb"
+							change="presetCb_changeHandler(event)"/>
+				<s:Label x="622"
+						 y="188"
+						 text="Preset"/>
+				<s:Label x="622"
+						 y="274"
+						 text="Time :"
+						 verticalAlign="top"/>
+				<ui:DraggableTextInput x="660"
+									   y="268"
+									   id="timeNs"
+									   minimum="0.2"
+									   maximum="20"
+									   value="4"
+									   snapInterval="0.1"
+									   liveDragging="false"
+									   change="_onTimeNsChange(event)"/>
+				<s:Label x="622"
+						 y="300"
+						 text="FPS  :"
+						 verticalAlign="top"/>
+				<ui:DraggableTextInput x="660"
+									   y="294"
+									   id="fpsNs"
+									   minimum="5"
+									   maximum="60"
+									   value="30"
+									   snapInterval="1"
+									   liveDragging="false"
+									   change="_onFpsNsChange(event)"/>
+
+			</s:BorderContainer>
+		</s:NavigatorContent>
+		<s:NavigatorContent>
+			<s:BorderContainer id="dummy"
+							   width="100%"
+							   height="7"
+							   skinClass="myproject.skins.MyBorderSkin"/>
+		</s:NavigatorContent>
+	</mx:ViewStack>
+
+</s:WindowedApplication>
